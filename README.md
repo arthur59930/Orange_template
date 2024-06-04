@@ -17,7 +17,7 @@
 
 ## Introduction
 
-Dans cette section, introduisez le contexte de l'audit de pentest, y compris les informations sur l'entreprise auditée, les dates de l'audit, et les parties prenantes impliquées.
+Cet audit de pentest a été réalisé dans le cadre d'un entretien d'embauche pour le poste de pentesteur chez Orange Cyber Defense. L'objectif principal est de démontrer mes compétences en matière de sécurité informatique et d'évaluation des vulnérabilités. Cet audit est une simulation pratique visant à identifier et évaluer les vulnérabilités au sein d'une infrastructure prédéfinie. Les résultats obtenus permettront de mettre en évidence mes capacités à mener des tests de pénétration approfondis et à fournir des recommandations de sécurité pertinentes.
 
 ## Objectifs de l'Audit
 
