@@ -1,4 +1,8 @@
 # Rapport d'Audit de Pentest
+- [x] #739
+- [ ] https://github.com/octo-org/octo-repo/issues/740
+- [ ] Add delight to the experience when all tasks are complete :tada:
+![Alt text](img/logo.png "logo OCD")
 
 ## Table des Matières
 
@@ -14,6 +18,10 @@
 6. [Recommandations](#recommandations)
 7. [Conclusion](#conclusion)
 8. [Annexes](#annexes)
+
+<div style="page-break-after: always; visibility: hidden"> 
+\pagebreak 
+</div>
 
 ## Introduction
 
@@ -50,11 +58,51 @@ Pour chaque vulnérabilité critique, fournissez les informations suivantes :
 - **Preuve de Concept :** Fournissez des exemples ou des captures d'écran.
 - **Recommandations :** Conseils pour remédier à la vulnérabilité.
 
+### Scénario d'exploitation
+
+#### Compromission de la machine <IP>
+
+>git log git status git show ⇒ trouver compte admin ⇒ RCE ⇒ leenpeas ⇒ USER ⇒ ROOT
+
+`Expliquer le cheminement global. (Ne pas hésiter a faire des réference)`
+
 ### Vulnérabilités Elevées
 
-Même structure que pour les vulnérabilités critiques.
+#### SQLI
+
+Nous avons trouvé une injection SQL su le paramêtre <>
+
+
+![Alt text](img/2024-06-05_19-23.png "Champ SQLI + injection")
+
+##### Remédiation 
+
+Il faudrait utilisé les PDO et faire des requêtes preparées
+
+#### Exposition de l'historique du code source
+
+Nous avons trouvé dans l'application Web le dossier .git qui contient l'ensemble des commits github du code source.
+
+Ce dossier contenait des Secrets utilisateurs
+
+![Alt text](img/2024-06-05_19-23.png "Screen des secret")
+
+##### Remédiation 
+
+Ne pas deployer le .git dans les fichiers accèssible en production.
+
+#### LFI
+
+En ce qui concerne la faille LFI,
+
+![Alt text](img/2024-06-05_19-23.png "Preuve LFI")
+
+##### Remédiation 
+
+
 
 ### Vulnérabilités Moyennes
+
 
 Même structure que pour les vulnérabilités critiques.
 
