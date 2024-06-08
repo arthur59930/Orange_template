@@ -16,6 +16,7 @@ Fait le **07/06/2024**
     - [Vulnérabilités Critiques](#vulnérabilités-critiques)
         - [Injection SQL](#injection-sql)
         - [Répertoires Sensibles Exposés](#répertoires-sensibles-exposés)
+        - [Xdebug PHP](#xdebug)
     - [Vulnérabilités Moyennes](#vulnérabilités-moyennes)
         - [Algorithmes de Hachage Dépassés](#algorithmes-de-hachage-dépassés)
     - [Vulnérabilités Faibles](#vulnérabilités-faibles)
@@ -39,31 +40,36 @@ Cet audit de pentest a été réalisé dans le cadre d'un entretien d'embauche p
 
 ## Résumé Rapide
 
-1. [**Scan Nmap**](#reconnaissance-active)
-    - Utilisation de `Nmap` pour obtenir des informations sur les services actifs.
-    - Port 80 (HTTP), 8080(HTTP) et 22 (SSH) ouverts.
-
-
-2. [**Énumération de Répertoires :**](#énumération-de-répertoire)
-    - Utilisation de `Gobuster` pour découvrir des répertoires cachés comme `/.git/`, `/admin/`.
-
 3. [**Exploitation des Vulnérabilités SQL :**](#exploitation-des-vulnérabilités-sql)
     - Découverte d'une injection SQL sur le paramètre `id` des pages admin.
     - Utilisation de `SQLmap` pour verifier l'exploitation de l'injection SQL.
 
-4. [**Accès aux Informations Sensibles :**](#accès-dossier-sensible)
-    - Récupération du dossier `.git` contenant des informations sensibles et des secrets d'utilisateur.
+1. [**Scan Nmap**](#reconnaissance-active)
+    - Utilisation de `Nmap` pour obtenir des informations sur les services actifs.
+    - Port 80 (HTTP), 8080(HTTP) et 22 (SSH) ouverts.
 
-5. [**Craquage des Mots de Passe :**](#craquage-de-mot-de-passe)
-    - Extraction et craquage du hachage MD5 des mots de passe avec `John the Ripper`.
+2. [**Énumération de Répertoires :**](#énumération-de-répertoire)
+    - Utilisation de `Gobuster` pour découvrir des répertoires cachés comme `/.git/`, `/admin/`.
+
+4. [**Accès aux code source de l'application :**](#accès-dossier-sensible)
+    - Récupération du dossier `.git` contenant des informations sensibles notamment le code source de l'application ainsi que des fichier SQL contenant des secrets.
+
+5. [**Cassage des Mots de Passe :**](#cassage-de-mot-de-passe)
+    - Extraction et craquage du hachage MD5 du mot de passe de l'utilisateur 'admin' par le biais de `John the Ripper`.
+
+5. [**Upload de fichier malicieux :**](#upload)
+    - dû a plusieurs manque de verification il a été possible d'upload des fichiers de type .php étant interpreter par le serveur.
+
+5. [**Execution de commande a distance :**](#rce)
+    - Par le biais d'un webshell, nous avons pu executer des commandes sur le serveur distant afin d'en prendre le controle.
 
 6. [**Accès SSH :**](#récupération-du-dossier-sur-ma-machine)
     - Utilisation des clés SSH trouvées pour accéder au serveur via SSH.
     - Accès réussi avec les identifiants craqués.
 
 7. [**Escalade de Privilèges :**](#passage-super-utilisateur)
-    - Exploitation des permissions `sudo` pour obtenir un accès root.
     - Utilisation de `linPEAS` pour identifier les escalade de privilèges.
+    - Exploitation des permissions `sudo` pour obtenir un accès root.
 
 <div style="page-break-after: always; visibility: hidden"> 
 \pagebreak 
@@ -77,17 +83,17 @@ Cet audit de pentest a été réalisé dans le cadre d'un entretien d'embauche p
 
 ##### Reconnaissance Active
 
-Nous avons commencé par un scan `Nmap` sur l'IP de la machine. Celui-ci nous a permis de constater que les ports 80 (Web HTTP), 8080 (Web HTTP) et 22 (SSH) étaient ouverts. Dans son résultat, nous voyons également qu'il trouve un dossier .git.
+Nous avons commencé par un scan `Nmap` sur l'IP 35.180.243.34. Celui-ci nous a permis de constater que les ports 80 (Web HTTP), 8080 (Web HTTP) et 22 (SSH) étaient ouverts. grace aux script d'enumeration de nmap (option `-sC`) nous avons pu découvrir un dossier nommée `.git` à la racine de l'application.
 
 ![Alt text](img/namp.png "Scan nmap")
 
-Nous avons donc immédiatement lancé une énumération de dossiers sur le serveur web avec `gobuster`.
-
 ##### Énumération de Répertoire
+
+Nous avons donc en parallèle lancé une énumération de dossiers sur le serveur web avec l'outil `gobuster` via la commande suivante : `gobuster dir -w `fzf-wordlists` -u http://35.180.243.34/`.
 
 ![Alt text](img/dirb.png "gobuster")
 
-Nous avons en même temps lancé un scan `nuclei` qui nous a permis de voir une potentielle injection SQL.
+Nous avons également lancé un scan `nuclei` qui nous a permis de voir une potentielle injection SQL ainsi que la fonctionnalité xdebug .
 
 ![Alt text](img/neclei_rapport.png "nuclei")
 
@@ -95,25 +101,39 @@ Nous avons alors utilisé SQLmap pour avoir la preuve que celle-ci était bien p
 
 ##### Exploitation des Vulnérabilités SQL
 
+Le résultat de nuclei nous indiquant une injection sql nous avons tenter de la verifier par le biais de SQlmap
+
+`sqlmap -u 'http://35.180.243.34/admin/view_car.php?id=-1'`
+
 ![Alt text](img/injectionSql.png "sqlmap")
 
-Le résultat de gobuster nous confirme la présence d'un dossier .git. Nous avons donc utilisé l'outil `git-dumper` pour récupérer ce dossier en local sur notre machine ainsi que le code source de la page web.
 
 ##### Accès Dossier Sensible
 
+Afin de confirmer la présente d'un dossier `.git`. Nous avons donc utilisé l'outil `git-dumper` disponible à [l'url suivante ](https://github.com/arthaud/git-dumper) :  afin de récupérer le contenu sur notre poste et ainsi parcourir le code source du site internet obtenus.
+
 ![Alt text](img/fetch.git.png ".git")
 
-En regardant dans le code source de la page web, nous pouvons trouver plusieurs informations intéressantes, telles que le type de hash utilisé sur l'application web (MD5).
-
-![Alt text](img/hashtypePassword.png "Type Hash")
-
-Ainsi que des secrets de l'administrateur (nom d'utilisateur, mot de passe).
+En regardant dans le code source de la page web, nous nous sommes apercu qu'un fichier .sql contenait le hash de l'utilisateur nommé 'admin'.
 
 ![Alt text](img/loginAdm.png "Hash de mot de passe")
+
+
+
+
 
 ##### Craquage de Mot de Passe
 
 Après avoir récupéré ces informations, nous pouvons lancer l'outil `John the Ripper` pour essayer de brute force le mot de passe.
+
+cependant, le hash étant assez commun, nous avions besoin de trouver le format de celui-ci.
+
+C'est pour cela que nous avons parcouru le code source à la recherche de l'algorithme utilisé, en l'occurence le MD5
+
+![Alt text](img/hashtypePassword.png "Type Hash")
+une fois toute les informations en notre possession nous avons pu très rapidement obtenir le mot de passe de l'utilisateur en utilisant la commande suivante : 
+
+`john hashAdmin.txt --format=Raw-MD5`
 
 ![Alt text](img/mdpAdmin.png "Mdp admin")
 
@@ -125,9 +145,13 @@ Une fois le mot de passe récupéré, nous pouvons nous connecter en tant qu'adm
 
 En regardant les pages accessibles sur le site, nous avons rapidement aperçu dans "system setting" la possibilité d'uploads de fichiers.
 
-Nous avons donc essayé d'envoyer un fichier .php qui contenait la fonction `phpinfo()`. Cette fonction permet à l'origine de voir les informations de configuration php. Dans notre cas, elle nous permet de vérifier que notre fichier envoyé est bien interprété par le serveur.
+Nous avons donc essayé d'uploader un fichier .php qui contenait uniquement la fonction `phpinfo()`. Cette fonction permet à l'origine de voir les informations de configuration php. Dans notre cas, elle nous permet de vérifier que notre fichier envoyé est bien interprété par le serveur.
 
-Une fois cela vérifié, nous devons trouver le chemin vers le fichier uploadé sur le site. Dans l'onglet Cars, nous pouvons voir apparaître l'image d'une voiture. Nous avons donc copié l'URL de l'image et remplacé le nom de l'image par le nom de notre fichier.
+Une fois cela vérifié, nous devons trouver le chemin vers le fichier uploadé sur le site. Dans l'onglet Cars, nous pouvons voir apparaître l'image d'une voiture.
+
+`http://35.180.243.34/admin/assets/uploads/xxx.png`
+
+ Nous avons donc copié l'URL de l'image et remplacé le nom de l'image par le nom de notre fichier.
 
 Nous avons également remarqué dans le code source php du site que le nom du fichier était horodaté.
 
