@@ -6,7 +6,7 @@
 
 Auteur : **Hallez Arthur**
 
-Contact : **arthur.hallez.59930@gmail.com**
+Contact : **arthur@gmail.com**
 
 Version : **1.0**
 
