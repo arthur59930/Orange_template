@@ -2,8 +2,6 @@
 
 ## A l'attention de TestaMotors
 
-![Alt text](img/logo.png "logo OCD")
-
 Auteur : **Hallez Arthur**
 
 Contact : **arthur@gmail.com**
